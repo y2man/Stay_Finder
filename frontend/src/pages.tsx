@@ -3,9 +3,9 @@ import { useSearchParams, useNavigate, useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { Search, ShieldCheck, Sparkles, Wallet } from 'lucide-react'
-import { api, assetUrl, Property } from './api'
+import { api, Property } from './api'
 import { useStore } from './store'
-import { PropertyCard, Reveal, Magnetic, Counter, Skeleton, Tilt } from './ui'
+import { PropertyCard, Reveal, Magnetic, Counter, Skeleton, Tilt, StayImage } from './ui'
 
 const usePage = (qs: string) =>
   useQuery({
@@ -13,6 +13,48 @@ const usePage = (qs: string) =>
     queryFn: () =>
       api<{ total: number; items: Property[] }>(`/properties?${qs}`)
   })
+
+function inlineMarkdown (text: string) {
+  return text.split(/(\*\*.+?\*\*|__.+?__|\*[^*]+\*)/g).map((part, i) => {
+    if ((part.startsWith('**') && part.endsWith('**')) || (part.startsWith('__') && part.endsWith('__'))) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>
+    }
+    if (part.startsWith('*') && part.endsWith('*')) return <em key={i}>{part.slice(1, -1)}</em>
+    return part
+  })
+}
+
+function AssistantMarkdown ({ content }: { content: string }) {
+  const blocks: { type: 'paragraph' | 'ul' | 'ol' | 'heading'; lines: string[] }[] = []
+  let current: typeof blocks[number] | undefined
+  const flush = () => { if (current) blocks.push(current); current = undefined }
+
+  for (const raw of content.split(/\r?\n/)) {
+    const line = raw.replace(/\s+$/, '')
+    if (!line.trim()) { flush(); continue }
+    const bullet = line.match(/^\s*[-*+]\s+(.+)$/)
+    const number = line.match(/^\s*\d+[.)]\s+(.+)$/)
+    const heading = line.match(/^\s*#{1,3}\s+(.+)$/)
+    const type = bullet ? 'ul' : number ? 'ol' : heading ? 'heading' : 'paragraph'
+    const value = bullet?.[1] ?? number?.[1] ?? heading?.[1] ?? line
+    if (!current || current.type !== type) { flush(); current = { type, lines: [] } }
+    current.lines.push(value)
+  }
+  flush()
+
+  return <div className='space-y-3 mt-1'>
+    {blocks.map((block, i) => {
+      if (block.type === 'ul' || block.type === 'ol') {
+        const List = block.type === 'ul' ? 'ul' : 'ol'
+        return <List key={i} className={`${block.type === 'ul' ? 'list-disc' : 'list-decimal'} pl-6 space-y-1`}>
+          {block.lines.map((line, j) => <li key={j}>{inlineMarkdown(line)}</li>)}
+        </List>
+      }
+      if (block.type === 'heading') return <h3 key={i} className='font-semibold text-lg'>{inlineMarkdown(block.lines.join(' '))}</h3>
+      return <p key={i}>{block.lines.map((line, j) => <span key={j}>{j > 0 && <br />}{inlineMarkdown(line)}</span>)}</p>
+    })}
+  </div>
+}
 
 export function HomePage () {
   const nav = useNavigate()
@@ -45,18 +87,18 @@ export function HomePage () {
         </div>
         <div className='relative h-64 hidden lg:block'>
           {(feat.data?.items ?? []).slice(0, 3).map((p, i) => (
-            <motion.img
+            <motion.div
               key={p.id}
-              src={assetUrl(p.image_url)}
-              alt=''
-              className='glass absolute w-56 h-40 object-cover p-1'
+              className='glass absolute w-56 h-40 p-1 overflow-hidden'
               style={{ left: i * 90, top: i * 40 }}
               animate={{
                 y: [0, -14, 0],
                 rotate: [i * 3 - 3, i * 3, i * 3 - 3]
               }}
               transition={{ duration: 5 + i, repeat: Infinity }}
-            />
+            >
+              <StayImage src={p.image_url} alt={p.title} loading='eager' className='w-full h-full object-cover' />
+            </motion.div>
           ))}
         </div>
       </section>
@@ -122,10 +164,9 @@ export function HomePage () {
                 to={`/explore?q=${d.city}`}
                 className='glass glow block overflow-hidden group'
               >
-                <img
-                  src={assetUrl(d.image_url)}
+                <StayImage
+                  src={d.image_url}
                   alt={d.city}
-                  loading='lazy'
                   className='h-40 w-full object-cover group-hover:scale-110 transition duration-700'
                 />
                 <div className='p-4'>
@@ -340,14 +381,12 @@ export function PropertyPage () {
   return (
     <div className='max-w-6xl mx-auto px-4 py-10 grid lg:grid-cols-[1fr_360px] gap-8'>
       <div>
-        <motion.img
+        <motion.div
           layoutId={d.id}
-          initial={{ scale: 1.05 }}
-          animate={{ scale: 1 }}
-          src={assetUrl(d.image_url)}
-          alt={d.title}
-          className='glass w-full h-96 object-cover p-1'
-        />
+          className='glass w-full h-96 p-1 overflow-hidden'
+        >
+          <StayImage src={d.image_url} alt={d.title} loading='eager' className='w-full h-full object-cover' />
+        </motion.div>
         <h1 className='text-3xl font-bold mt-6'>{d.title}</h1>
         <p className='opacity-70'>
           {d.city}, {d.country} · {d.bedrooms} bedrooms · {d.bathrooms}{' '}
@@ -1081,7 +1120,9 @@ export function AssistantPage () {
             }`}
           >
             <b className='text-xs uppercase opacity-60'>{m.role}</b>
-            <p className='whitespace-pre-wrap mt-1'>{m.content}</p>
+            {m.role === 'assistant'
+              ? <AssistantMarkdown content={m.content} />
+              : <p className='whitespace-pre-wrap mt-1'>{m.content}</p>}
           </div>
         ))}
         {busy && <p className='opacity-60'>Thinking…</p>}

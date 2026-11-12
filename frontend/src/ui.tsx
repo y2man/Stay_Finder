@@ -1,4 +1,4 @@
-import { useEffect, useRef, ReactNode } from "react";
+import { useEffect, useRef, useState, ReactNode } from "react";
 import { motion, useMotionValue, useTransform, useSpring, animate, useInView, AnimatePresence } from "framer-motion";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { Moon, Sun, Star, BedDouble, Users, Heart, Home } from "lucide-react";
@@ -33,12 +33,19 @@ export function Counter({ to, suffix = "" }: { to: number; suffix?: string }) {
 }
 export const Skeleton = ({ h = "h-72" }: { h?: string }) => <div className={`glass ${h} relative overflow-hidden`}><div className="shimmer absolute inset-0" /></div>;
 
+const FALLBACK_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 500'%3E%3Cdefs%3E%3ClinearGradient id='g' x2='0' y2='1'%3E%3Cstop stop-color='%23334155'/%3E%3Cstop offset='1' stop-color='%230f172a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='800' height='500' fill='url(%23g)'/%3E%3Cpath d='M250 290 400 160l150 130v120H250z' fill='none' stroke='%2394a3b8' stroke-width='18' stroke-linejoin='round'/%3E%3Cpath d='M365 410V305h70v105' fill='none' stroke='%2394a3b8' stroke-width='16'/%3E%3C/svg%3E";
+
+export function StayImage({ src, alt, className, loading = "lazy" }: { src?: string; alt: string; className: string; loading?: "lazy" | "eager" }) {
+  const [failed, setFailed] = useState(false);
+  return <img src={!src || failed ? FALLBACK_IMAGE : assetUrl(src)} alt={alt} loading={loading} className={className} onError={() => setFailed(true)} />;
+}
+
 export function PropertyCard({ p, list = false }: { p: Property; list?: boolean }) {
   const say = useStore(s => s.say);
   const save = async (e: any) => { e.preventDefault(); e.stopPropagation(); try { await (await import("./api")).api(`/favorites/${p.id}`, { method: "POST" }); say("Added to saved stays"); } catch (err) { say((err as Error).message); } };
   return <Tilt><Link to={`/property/${p.id}`} className={`glass glow overflow-hidden group block ${list ? "sm:flex" : ""}`}>
     <div className={`overflow-hidden relative ${list ? "sm:w-72 shrink-0" : ""}`}>
-      <img src={assetUrl(p.image_url)} alt={p.title} loading="lazy" className="h-48 w-full object-cover transition duration-700 group-hover:scale-110" />
+      <StayImage src={p.image_url} alt={p.title} className="h-48 w-full object-cover transition duration-700 group-hover:scale-110" />
       <motion.span whileTap={{ scale: 1.4 }} onClick={save} role="button" aria-label="Favorite"
         className="absolute top-3 right-3 glass p-2 rounded-full"><Heart size={16} /></motion.span></div>
     <div className="p-4"><h3 className="font-semibold">{p.title}</h3><p className="opacity-70 text-sm">{p.city}, {p.country}</p>
