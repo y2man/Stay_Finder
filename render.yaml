@@ -23,9 +23,9 @@ services:
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT
-        value: "587"
+        value: "465"
       - key: SMTP_USE_SSL
-        value: "false"
+        value: "true"
       - key: SMTP_USER
         sync: false
       - key: SMTP_PASSWORD
@@ -41,7 +41,7 @@ services:
       - key: GROQ_API_KEY
         sync: false
       - key: GROQ_MODEL
-        value: llama-3.3-70b-versatile
+        value: openai/gpt-oss-120b
       - key: UPLOAD_PROVIDER
         value: cloudinary
       - key: CLOUDINARY_CLOUD_NAME
